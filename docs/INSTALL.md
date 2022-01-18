@@ -4,6 +4,7 @@ FitSNAP3 requires two things:
 
 1. LAMMPS
 2. Several standard Python packages
+3. sklearn for sparse solvers
 
 * For information on building the LAMMPS shared library, see docs/LAMMPS.md
 

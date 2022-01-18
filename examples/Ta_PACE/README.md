@@ -32,10 +32,6 @@ ard_bigbase/
 Reference folder for ace potential using ARD with more descriptors than structures (734 descriptors)
 Training with these parameters produces a comparable potential to those in svd/ with 163 non-zero parameters
 
-cleanup.sh
-
-Shell script for cleaning up example files between FitSNAP runs
-
 JSON/
 
 Directory that contains all the training configurations which are organized
@@ -84,7 +80,7 @@ wigner_flag = 1         : Flag to use wigner 3j coupling coefficients (generaliz
 
 See docs/TEMPLATE.in for further information on input parameters
 
-##### For LASSO regression training
+##### For LASSO regression training (sklearn required)
 
 Lasso regression applies an l1 norm penalty to the least squares cost function, and is useful for obtaining sparse solutions. 
 See https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LassoRegression.html for more info.
@@ -97,7 +93,7 @@ max_iter = 1000              : maximum number of iterations to minimize the LASS
 
 Warning: increasing max_iter may significantly increase training time if the fit is unstable. (See ARD for a more stable sparse training method.)
 
-##### For ARD (automatic relevence determination) regression training
+##### For ARD (automatic relevence determination) regression training (sklearn required)
 
 ARDR is a Bayesian method that is good at obtaining sparse solutions to fitting problems. The prior distribution for each descriptor may be differrent, and the training is stabilized by shifting the priors towards 0. 
 The ARDR cost function has l1 and l2 regularizing properties.
