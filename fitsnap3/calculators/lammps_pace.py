@@ -72,7 +72,7 @@ class LammpsPace(Calculator):
 
         #Needs reworking when lammps will accept variable 2J
         #self._lmp.command(f"variable twojmax equal {max(config.sections['ACE'].twojmax)}")
-        self._lmp.command(f"variable rcutfac equal {config.sections['ACE'].rcutfac}")
+        self._lmp.command(f"variable rcutfac equal {max(config.sections['ACE'].rcutfac)}")
         #self._lmp.command(f"variable rfac0 equal {config.sections['ACE'].rfac0}")
 #        self._lmp.command(f"variable rmin0 equal {config.sections['ACE'].rmin0}")
 
@@ -134,7 +134,7 @@ class LammpsPace(Calculator):
 
         # everything is handled by LAMMPS compute pace (same format as compute snap) with same dummy variables currently
 
-        base_pace = "compute snap all pace coupling_coefficients.ace"
+        base_pace = "compute snap all pace coupling_coefficients.yace"
         self._lmp.command(base_pace)
 
     def _run_lammps(self):
@@ -159,6 +159,7 @@ class LammpsPace(Calculator):
         # Extract SNAP data, including reference potential data
 
         nrows_energy = 1
+        bik_rows = 1
         ndim_force = 3
         nrows_force = ndim_force * num_atoms
         ndim_virial = 6
@@ -167,7 +168,8 @@ class LammpsPace(Calculator):
         ncols_bispectrum = n_coeff * num_types
         ncols_reference = 1
         ncols_snap = ncols_bispectrum + ncols_reference
-        index = pt.fitsnap_dict['a_indices'][self._i]
+        index = self.shared_index
+        dindex = self.distributed_index
 
         lmp_snap = _extract_compute_np(self._lmp, "snap", 0, 2, (nrows_snap, ncols_snap))
 
@@ -176,6 +178,9 @@ class LammpsPace(Calculator):
                                                                                   self._data["Group"]))
 
         irow = 0
+        bik_rows = 1
+        if config.sections['ACE'].bikflag:
+            bik_rows = num_atoms
         icolref = ncols_bispectrum
         if config.sections["CALCULATOR"].energy:
             b_sum_temp = lmp_snap[irow, :ncols_bispectrum] / num_atoms
@@ -190,9 +195,11 @@ class LammpsPace(Calculator):
             if not config.sections["ACE"].bzeroflag: b000sum0 = 1.0
             b000sum = sum(b_sum_temp[::nstride])
             if (abs(b000sum - b000sum0) < EPS): 
-                print("WARNING: Configuration has no PACE neighbors")
+                pt.single_print("WARNING: Configuration has no PACE neighbors")
 
             if not config.sections["ACE"].bzeroflag:
+                if config.sections['ACE'].bikflag:
+                    raise NotImplementedError("per atom energy is not implemented without bzeroflag")
                 b_sum_temp.shape = (num_types, n_coeff)
                 onehot_atoms = np.zeros((num_types, 1))
                 for atom in self._data["AtomTypes"]:
@@ -205,8 +212,11 @@ class LammpsPace(Calculator):
             ref_energy = lmp_snap[irow, icolref]
             pt.shared_arrays['b'].array[index] = (energy - ref_energy) / num_atoms
             pt.shared_arrays['w'].array[index] = self._data["eweight"]
-            irow += nrows_energy
-            index += 1
+            pt.fitsnap_dict['Row_Type'][dindex:dindex + bik_rows] = ['Energy'] * nrows_energy
+            pt.fitsnap_dict['Atom_I'][dindex:dindex + bik_rows] = [int(i) for i in range(nrows_energy)]
+            index += nrows_energy
+            dindex += nrows_energy
+        irow += nrows_energy
 
         if config.sections["CALCULATOR"].force:
             db_atom_temp = lmp_snap[irow:irow + nrows_force, :ncols_bispectrum]
@@ -223,8 +233,11 @@ class LammpsPace(Calculator):
                 self._data["Forces"].ravel() - ref_forces
             pt.shared_arrays['w'].array[index:index+num_atoms * ndim_force] = \
                 self._data["fweight"]
-            irow += nrows_force
+            pt.fitsnap_dict['Row_Type'][dindex:dindex + nrows_force] = ['Force'] * nrows_force
+            pt.fitsnap_dict['Atom_I'][dindex:dindex + nrows_force] = [int(np.floor(i/3)) for i in range(nrows_force)]
             index += num_atoms * ndim_force
+            dindex += num_atoms * ndim_force
+        irow += nrows_force
 
         if config.sections["CALCULATOR"].stress:
             vb_sum_temp = 1.6021765e6*lmp_snap[irow:irow + nrows_virial, :ncols_bispectrum] / lmp_volume
@@ -241,7 +254,17 @@ class LammpsPace(Calculator):
                 self._data["Stress"][[0, 1, 2, 1, 0, 0], [0, 1, 2, 2, 2, 1]].ravel() - ref_stress
             pt.shared_arrays['w'].array[index:index+ndim_virial] = \
                 self._data["vweight"]
+            pt.fitsnap_dict['Row_Type'][dindex:dindex + ndim_virial] = ['Stress'] * ndim_virial
+            pt.fitsnap_dict['Atom_I'][dindex:dindex + ndim_virial] = [int(0)] * ndim_virial
             index += ndim_virial
+            dindex += ndim_virial
+
+        length = dindex - self.distributed_index
+        pt.fitsnap_dict['Groups'][self.distributed_index:dindex] = ['{}'.format(self._data['Group'])] * length
+        pt.fitsnap_dict['Configs'][self.distributed_index:dindex] = ['{}'.format(self._data['File'])] * length
+        pt.fitsnap_dict['Testing'][self.distributed_index:dindex] = [bool(self._data['test_bool'])] * length
+        self.shared_index = index
+        self.distributed_index = dindex
 
 # this is super clean when there is only one value per key, needs reworking
 def _lammps_variables(bispec_options):
