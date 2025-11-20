@@ -123,7 +123,7 @@ def get_default_settings(elems,nshell=1.0,return_range=True,apply_shift=False,me
         print ('\n')
 
 
-    assert tuple(elems) == tuple(sorted(elems)), " elements must be listed alphabetically"
+   # assert tuple(elems) == tuple(sorted(elems)), " elements must be listed alphabetically"
     bonds =[bp for bp in itertools.product(elems,elems)]
     rc_range = {bp:None for bp in bonds}
     rin_def = {bp:None for bp in bonds}
@@ -161,7 +161,8 @@ def get_default_settings(elems,nshell=1.0,return_range=True,apply_shift=False,me
 #uncomment for different examples
 #NOTE LATER USE THIS WITH H
 #elems = ['H','N','W']
-elems = ['N','W']
+#elems = ['N','W']
+elems = ['H','O']
 #elems = sorted(elems) #NOTE, it is highly recommended to sort element types alphabetically but not required
 #NOTE increase nshell to include longer-range interactions in ACE
 #rc_range,rc_default,lmb_default,rcin_default = get_default_settings(elems,nshell=2.2,return_range=True,apply_shift=False)

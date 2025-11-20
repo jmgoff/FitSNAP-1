@@ -32,7 +32,7 @@ compute_testerrs = 1
 detailed_errors = 1
 
 [RIDGE]
-alpha = 1.0e-5
+alpha = 1.0e1
 
 [SCRAPER]
 scraper = JSON
